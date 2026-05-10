@@ -1,0 +1,140 @@
+
+<style>
+  .stage-btn { padding: 8px 18px; border-radius: 20px; border: 1.5px solid var(--color-border-secondary); background: var(--color-background-secondary); color: var(--color-text-secondary); font-size: 13px; cursor: pointer; transition: all .2s; font-family: var(--font-sans); }
+  .stage-btn.active { border-color: var(--active-color); background: var(--active-bg); color: var(--active-text); }
+  .panel { display: none; }
+  .panel.visible { display: block; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 10px; font-weight: 500; margin-right: 4px; }
+  .prop-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 10px 0; }
+  .prop { background: var(--color-background-secondary); border-radius: 8px; padding: 8px 14px; font-size: 12px; color: var(--color-text-secondary); flex: 1; min-width: 120px; }
+  .prop strong { display: block; font-size: 13px; color: var(--color-text-primary); font-weight: 500; margin-bottom: 2px; }
+  .why-box { border-left: 3px solid var(--active-color, #888); border-radius: 0; padding: 10px 14px; background: var(--color-background-secondary); margin-top: 12px; font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; }
+</style>
+
+<div style="padding: 4px 0 12px;">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="btn-row">
+    <button class="stage-btn active" style="--active-color:#185FA5;--active-bg:#E6F1FB;--active-text:#0C447C" onclick="show('wake',this)">Wake</button>
+    <button class="stage-btn" style="--active-color:#0F6E56;--active-bg:#E1F5EE;--active-text:#085041" onclick="show('nrem',this)">NREM sleep</button>
+    <button class="stage-btn" style="--active-color:#854F0B;--active-bg:#FAEEDA;--active-text:#633806" onclick="show('rem',this)">REM sleep</button>
+    <button class="stage-btn" style="--active-color:#A32D2D;--active-bg:#FCEBEB;--active-text:#791F1F" onclick="show('artifact',this)">Artifact</button>
+  </div>
+
+  <div id="panel-wake" class="panel visible">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:16px;font-weight:500;color:var(--color-text-primary)">Wake (code 1)</span>
+      <span class="tag" style="background:#E6F1FB;color:#0C447C;">50.9% of data</span>
+      <span class="tag" style="background:#E6F1FB;color:#0C447C;">class 0 in model</span>
+    </div>
+    <svg width="100%" viewBox="0 0 620 80" style="margin-bottom:4px">
+      <text x="8" y="42" style="font-size:11px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">EEG1</text>
+      <line x1="50" y1="40" x2="610" y2="40" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
+      <polyline fill="none" stroke="#378ADD" stroke-width="1.5" stroke-linejoin="round"
+        points="50,40 58,22 64,52 70,18 76,55 82,28 88,48 94,20 100,50 106,32 112,44 118,24 124,52 130,30 136,42 142,20 148,50 154,34 160,44 168,22 174,50 180,30 186,46 192,26 198,52 204,36 210,42 216,24 222,52 228,34 234,44 240,26 246,50 252,32 258,44 264,22 270,50 276,34 282,46 288,28 294,50 300,36 306,42 312,20 318,52 324,32 330,44 336,24 342,52 348,30 354,42 360,22 366,52 372,36 378,44 384,24 390,50 396,30 402,44 408,22 414,52 420,34 426,42 432,26 438,50 444,32 450,44 456,24 462,52 468,34 474,44 480,22 486,52 492,32 498,46 504,28 510,50 516,34 522,44 528,26 534,50 540,32 546,46 552,28 558,50 564,34 570,44 576,26 582,50 588,36 594,44 600,26 606,52 610,40"/>
+    </svg>
+    <svg width="100%" viewBox="0 0 620 60" style="margin-bottom:10px">
+      <text x="8" y="32" style="font-size:11px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">EMG</text>
+      <line x1="50" y1="30" x2="610" y2="30" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
+      <polyline fill="none" stroke="#E24B4A" stroke-width="1.2" stroke-linejoin="round"
+        points="50,30 54,18 56,42 58,15 60,45 62,20 64,38 66,12 68,46 70,22 72,36 74,14 76,44 78,24 80,34 82,10 84,48 86,22 88,38 90,16 92,44 94,26 96,36 98,14 100,44 102,24 104,36 106,16 108,46 110,22 114,30 120,28 124,42 126,18 128,44 130,22 132,38 134,14 136,46 140,30 144,28 148,44 150,18 152,42 160,30 170,28 180,30 190,28 200,30 210,28 220,42 222,18 224,44 226,22 230,30 240,28 250,30 260,28 270,44 272,16 274,46 276,22 280,30 290,28 300,30 310,44 312,18 314,46 316,20 320,30 340,28 350,30 360,28 370,44 374,18 376,46 380,22 390,30 400,28 410,42 412,16 414,46 416,22 420,30 440,28 450,30 460,28 470,44 472,18 474,44 476,22 480,30 500,28 510,30 520,28 530,44 532,16 534,46 536,22 540,30 560,28 570,30 580,28 590,44 594,18 596,46 598,22 600,30 610,30"/>
+    </svg>
+    <div class="prop-row">
+      <div class="prop"><strong>Dominant freq.</strong>Beta + Gamma (13–45 Hz)</div>
+      <div class="prop"><strong>EEG amplitude</strong>Low — fast, small waves</div>
+      <div class="prop"><strong>EMG</strong>High — active muscles</div>
+      <div class="prop"><strong>Eyes</strong>Open, moving</div>
+    </div>
+    <div class="why-box" style="--active-color:#378ADD">
+      The mouse is awake and active. The EEG is desynchronized — many neurons firing independently, producing high-frequency low-amplitude noise. EMG is strong because muscles are in use. This is the majority class (51%) and also the easiest for the model to classify because the EMG signal alone is a strong indicator.
+    </div>
+  </div>
+
+  <div id="panel-nrem" class="panel">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:16px;font-weight:500;color:var(--color-text-primary)">NREM sleep (code 2)</span>
+      <span class="tag" style="background:#E1F5EE;color:#085041;">41.5% of data</span>
+      <span class="tag" style="background:#E1F5EE;color:#085041;">class 1 in model</span>
+    </div>
+    <svg width="100%" viewBox="0 0 620 80" style="margin-bottom:4px">
+      <text x="8" y="42" style="font-size:11px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">EEG1</text>
+      <line x1="50" y1="40" x2="610" y2="40" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
+      <polyline fill="none" stroke="#1D9E75" stroke-width="1.8" stroke-linejoin="round"
+        points="50,40 65,14 80,66 95,12 110,68 125,14 140,66 155,14 170,66 185,14 200,66 215,14 230,66 245,14 260,66 275,14 290,66 305,14 320,66 335,14 350,66 365,14 380,66 395,14 410,66 425,14 440,66 455,14 470,66 485,14 500,66 515,14 530,66 545,14 560,66 575,14 590,66 605,40 610,40"/>
+    </svg>
+    <svg width="100%" viewBox="0 0 620 60" style="margin-bottom:10px">
+      <text x="8" y="32" style="font-size:11px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">EMG</text>
+      <line x1="50" y1="30" x2="610" y2="30" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
+      <polyline fill="none" stroke="#E24B4A" stroke-width="1.2" stroke-linejoin="round"
+        points="50,30 60,28 80,32 100,29 120,31 140,30 160,29 180,31 200,30 220,29 240,31 260,30 280,29 300,31 320,30 340,29 360,31 380,30 400,29 420,31 440,30 460,29 480,31 500,30 520,29 540,31 560,30 580,29 600,31 610,30"/>
+    </svg>
+    <div class="prop-row">
+      <div class="prop"><strong>Dominant freq.</strong>Delta (0.5–4 Hz)</div>
+      <div class="prop"><strong>EEG amplitude</strong>Very high — big slow waves</div>
+      <div class="prop"><strong>EMG</strong>Low — muscles relaxed</div>
+      <div class="prop"><strong>Eyes</strong>Closed, still</div>
+    </div>
+    <div class="why-box" style="--active-color:#1D9E75">
+      The mouse is in deep sleep. Huge numbers of neurons fire together in slow synchronized waves — this is called delta activity. The brain is consolidating memories and clearing metabolic waste. EMG drops near zero because muscles are atonic. In your dataset this is the second-largest class (41.5%) and the most visually distinctive on EEG — the giant slow waves are unmistakable. Delta power is the single most useful feature for your model.
+    </div>
+  </div>
+
+  <div id="panel-rem" class="panel">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:16px;font-weight:500;color:var(--color-text-primary)">REM sleep (code 3)</span>
+      <span class="tag" style="background:#FAEEDA;color:#633806;">5.9% of data</span>
+      <span class="tag" style="background:#FAEEDA;color:#633806;">class 2 in model</span>
+      <span class="tag" style="background:#FCEBEB;color:#791F1F;">minority class</span>
+    </div>
+    <svg width="100%" viewBox="0 0 620 80" style="margin-bottom:4px">
+      <text x="8" y="42" style="font-size:11px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">EEG1</text>
+      <line x1="50" y1="40" x2="610" y2="40" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
+      <polyline fill="none" stroke="#EF9F27" stroke-width="1.5" stroke-linejoin="round"
+        points="50,40 56,30 62,48 68,28 74,50 80,32 86,46 92,26 98,52 106,36 112,44 120,34 126,48 134,30 140,46 148,26 154,52 162,36 168,44 176,30 182,50 190,34 196,46 202,28 210,52 218,36 224,44 232,30 238,50 244,34 252,46 258,26 264,52 272,36 278,44 286,30 292,48 298,34 306,46 312,26 320,52 326,36 334,46 340,30 346,50 354,36 360,44 368,28 374,52 382,36 388,44 396,30 402,50 408,36 414,46 420,26 428,52 434,36 440,44 448,30 454,50 460,34 468,46 474,28 482,52 488,36 494,44 502,30 508,50 514,36 520,44 528,28 534,52 542,36 548,44 556,30 562,50 568,34 576,46 582,28 590,50 596,36 604,44 610,40"/>
+    </svg>
+    <svg width="100%" viewBox="0 0 620 60" style="margin-bottom:10px">
+      <text x="8" y="32" style="font-size:11px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">EMG</text>
+      <line x1="50" y1="30" x2="610" y2="30" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
+      <polyline fill="none" stroke="#E24B4A" stroke-width="1.2" stroke-linejoin="round"
+        points="50,30 60,29 80,30 100,30 120,29 140,30 160,30 180,29 200,31 220,30 240,29 260,30 280,30 300,29 320,31 340,30 360,29 380,30 400,30 420,29 440,31 460,30 480,29 500,30 520,30 540,29 560,31 580,30 600,29 610,30"/>
+    </svg>
+    <div class="prop-row">
+      <div class="prop"><strong>Dominant freq.</strong>Theta (4–8 Hz)</div>
+      <div class="prop"><strong>EEG amplitude</strong>Medium — irregular mixed</div>
+      <div class="prop"><strong>EMG</strong>Nearly zero — muscle atonia</div>
+      <div class="prop"><strong>Eyes</strong>Rapid movement (REM)</div>
+    </div>
+    <div class="why-box" style="--active-color:#EF9F27">
+      This is the dreaming stage. The EEG looks superficially similar to Wake — both have low-amplitude, relatively fast activity — but the EMG is the key differentiator: in REM, muscles are completely paralyzed (atonia) as a safety mechanism to stop the mouse acting out its dreams. The brain is very active (theta waves dominate in mice). This is your hardest class — only 6% of data, and EEG alone can be confused with Wake. Your model must lean heavily on EMG to separate REM from Wake.
+    </div>
+  </div>
+
+  <div id="panel-artifact" class="panel">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:16px;font-weight:500;color:var(--color-text-primary)">Artifact (code 4)</span>
+      <span class="tag" style="background:#FCEBEB;color:#791F1F;">1.6% of data</span>
+      <span class="tag" style="background:#F1EFE8;color:#444441;">removed before training</span>
+    </div>
+    <svg width="100%" viewBox="0 0 620 80" style="margin-bottom:4px">
+      <text x="8" y="42" style="font-size:11px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">EEG1</text>
+      <line x1="50" y1="40" x2="610" y2="40" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
+      <polyline fill="none" stroke="#E24B4A" stroke-width="1.5" stroke-linejoin="round"
+        points="50,40 54,38 58,36 62,40 68,42 76,8 80,72 84,6 88,74 92,40 100,38 110,40 120,4 124,76 128,8 132,72 138,40 148,38 160,40 170,42 180,40 184,36 192,40 200,4 204,76 208,6 212,74 218,40 230,38 240,40 250,42 260,40 270,38 280,40 284,4 288,76 292,8 296,72 300,40 310,38 320,40 330,42 340,40 350,6 354,74 358,8 362,72 370,40 380,38 390,40 400,42 410,8 414,72 418,6 422,74 430,40 440,38 450,40 460,42 470,8 474,72 478,6 482,74 490,40 500,38 510,40 520,42 530,8 534,72 538,6 542,74 550,40 560,38 570,40 580,42 590,40 600,38 610,40"/>
+    </svg>
+    <div class="prop-row">
+      <div class="prop"><strong>Cause</strong>Movement, electrode shift</div>
+      <div class="prop"><strong>EEG look</strong>Random huge spikes</div>
+      <div class="prop"><strong>Action</strong>Remove before training</div>
+    </div>
+    <div class="why-box" style="--active-color:#E24B4A">
+      These epochs are not real brain signals — they are contamination from the mouse moving around, scratching, or the electrode losing contact with the skull. Human scorers label these separately so they can be excluded. In preprocessing (Step 3), you will filter out all epochs where stage == 4 before building your training set. Never let the model learn from artifacts, as they will confuse every class boundary.
+    </div>
+  </div>
+</div>
+
+<script>
+function show(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('visible'));
+  document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('visible');
+  btn.classList.add('active');
+}
+</script>
