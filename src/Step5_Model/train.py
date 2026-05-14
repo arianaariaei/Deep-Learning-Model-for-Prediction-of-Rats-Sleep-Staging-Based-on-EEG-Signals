@@ -15,7 +15,7 @@ from src.Step4_DatasetSplitting.dataset import make_dataloaders, SleepDataset, C
 from models import get_model
 from trainer import train
 
-CHECKPOINT_DIR = Path(r"D:\university\4042\Final Project\checkpoints")
+CHECKPOINT_DIR = Path(r"../../checkpoints")
 CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
 
 SEED = 42
@@ -267,5 +267,4 @@ print(f"\nSaved → {out}")
 with open(DATA_DIR / "training_histories.json", "w") as f:
     json.dump(all_histories, f, indent=2)
 
-print("\nStep 6 complete.")
 print(f"Checkpoints saved to: {CHECKPOINT_DIR}")

@@ -2,9 +2,9 @@
 from pathlib import Path
 
 # ── Edit these paths to match your machine ────────────────────────────────────
-BASE         = Path(r"D:\university\4042\Final Project\ds006366")
-FIGURES_DIR  = Path(r"D:\university\4042\Final Project\figures")
-DATA_DIR     = Path(r"D:\university\4042\Final Project\data")
+BASE         = Path(r"D:\university\4042\Deep-Learning-Model-for-Prediction-of-Rats-Sleep-Staging-Based-on-EEG-Signals\ds006366")
+FIGURES_DIR  = Path(r"D:\university\4042\Deep-Learning-Model-for-Prediction-of-Rats-Sleep-Staging-Based-on-EEG-Signals\figures")
+DATA_DIR     = Path(r"D:\university\4042\Deep-Learning-Model-for-Prediction-of-Rats-Sleep-Staging-Based-on-EEG-Signals\data")
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Signal constants

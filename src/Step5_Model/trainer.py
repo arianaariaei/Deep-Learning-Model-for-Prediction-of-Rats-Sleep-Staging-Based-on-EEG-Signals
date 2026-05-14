@@ -69,7 +69,7 @@ def train_one_epoch(
         optimizer.zero_grad()
 
         if scaler is not None:
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast('cuda'):
                 logits = model(X_batch)
                 loss   = criterion(logits, y_batch)
             scaler.scale(loss).backward()
@@ -138,7 +138,7 @@ def train(
 
     Returns history dict with loss/accuracy curves.
     """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda")
     print(f"\nTraining on: {device}")
     if device.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(0)}")
@@ -161,7 +161,7 @@ def train(
                                     checkpoint_path=checkpoint_path)
 
     # Mixed precision scaler (only meaningful on CUDA)
-    scaler = torch.cuda.amp.GradScaler() if device.type == "cuda" else None
+    scaler = torch.amp.GradScaler('cuda') if device.type == "cuda" else None
 
     history = {
         "train_loss": [], "val_loss": [],
