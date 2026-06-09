@@ -1,4 +1,5 @@
 # src/models.py
+import math
 import torch
 import torch.nn as nn
 
@@ -16,10 +17,15 @@ class BaselineMLP(nn.Module):
     something is wrong with the deep model.
     """
     def __init__(self, n_features: int = 29, n_classes: int = 3,
-                 dropout: float = 0.3):
+                 dropout: float = 0.35):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(n_features, 128),
+            nn.Linear(n_features, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+
+            nn.Linear(256, 128),
             nn.BatchNorm1d(128),
             nn.ReLU(),
             nn.Dropout(dropout),
@@ -50,7 +56,7 @@ class BaselineMLP(nn.Module):
 # ══════════════════════════════════════════════════════════════════════════════
 
 class ConvBlock(nn.Module):
-    """Conv1d → BatchNorm → ReLU → MaxPool → Dropout"""
+    """Conv1d -> BatchNorm -> ReLU -> MaxPool -> Dropout"""
     def __init__(self, in_ch, out_ch, kernel, pool=2, dropout=0.25):
         super().__init__()
         self.block = nn.Sequential(
@@ -148,7 +154,7 @@ class SleepCNNLSTM(nn.Module):
             ConvBlock(64,         128, kernel=10, pool=2, dropout=0.2),
             ConvBlock(128,        256, kernel=5,  pool=2, dropout=0.2),
             nn.AdaptiveAvgPool1d(1),
-            nn.Flatten(),           # → (batch, 256)
+            nn.Flatten(),           # -> (batch, 256)
         )
 
         # LSTM reads the sequence of CNN embeddings
@@ -187,12 +193,96 @@ class SleepCNNLSTM(nn.Module):
         return self.classifier(x)            # (batch, n_classes)
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  MODEL D — Transformer  (self-attention over epoch sequences)
+#  Input : (batch, seq_len, 2, 512)
+#  Output: (batch, 3)
+#
+#  Same CNN encoder as CNN+LSTM extracts per-epoch embeddings, then a
+#  Transformer encoder attends over the whole context window.
+#  Pre-norm (norm_first=True) improves training stability.
+# ══════════════════════════════════════════════════════════════════════════════
+
+class PositionalEncoding(nn.Module):
+    """Sinusoidal positional encoding for Transformer input sequences."""
+    def __init__(self, d_model: int, max_len: int = 64, dropout: float = 0.1):
+        super().__init__()
+        self.dropout = nn.Dropout(dropout)
+        pe = torch.zeros(max_len, d_model)
+        pos = torch.arange(0, max_len).unsqueeze(1).float()
+        div = torch.exp(
+            torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)
+        )
+        pe[:, 0::2] = torch.sin(pos * div)
+        pe[:, 1::2] = torch.cos(pos * div)
+        self.register_buffer("pe", pe.unsqueeze(0))   # (1, max_len, d_model)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.dropout(x + self.pe[:, :x.size(1)])
+
+
+class SleepTransformer(nn.Module):
+    """
+    CNN feature extractor + Transformer encoder for sleep staging.
+
+    Input shape : (batch, seq_len, n_channels, n_samples)
+    Output shape: (batch, n_classes)  — label for the CENTER epoch
+    """
+    def __init__(self, n_channels: int = 2, n_classes: int = 3,
+                 seq_len: int = 31, d_model: int = 256,
+                 nhead: int = 8, num_layers: int = 4,
+                 dim_feedforward: int = 512, dropout: float = 0.1):
+        super().__init__()
+        self.seq_len = seq_len
+
+        # Shared CNN encoder — same backbone as SleepCNNLSTM
+        self.cnn = nn.Sequential(
+            ConvBlock(n_channels, 32,  kernel=50, pool=4, dropout=0.2),
+            ConvBlock(32,         64,  kernel=25, pool=2, dropout=0.2),
+            ConvBlock(64,         128, kernel=10, pool=2, dropout=0.2),
+            ConvBlock(128,        256, kernel=5,  pool=2, dropout=0.2),
+            nn.AdaptiveAvgPool1d(1),
+            nn.Flatten(),               # -> (batch, 256)
+        )
+
+        self.pos_enc = PositionalEncoding(d_model, max_len=seq_len + 4,
+                                          dropout=dropout)
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model, nhead=nhead,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout, batch_first=True,
+            norm_first=True,            # pre-norm: more stable training
+        )
+        self.transformer = nn.TransformerEncoder(encoder_layer,
+                                                  num_layers=num_layers)
+
+        self.classifier = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Linear(d_model, 64),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(64, n_classes),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        batch, seq_len, C, T = x.shape
+        x = x.view(batch * seq_len, C, T)  # (B*S, C, T)
+        x = self.cnn(x)                     # (B*S, 256)
+        x = x.view(batch, seq_len, 256)     # (B, S, 256)
+        x = self.pos_enc(x)                 # (B, S, 256)
+        x = self.transformer(x)             # (B, S, 256)
+        center = x[:, seq_len // 2, :]     # (B, 256) — center epoch
+        return self.classifier(center)      # (B, n_classes)
+
+
 def get_model(name: str, **kwargs) -> nn.Module:
     """Factory function — returns model by name."""
     models = {
-        "mlp":      BaselineMLP,
-        "cnn":      SleepCNN,
-        "cnn_lstm": SleepCNNLSTM,
+        "mlp":         BaselineMLP,
+        "cnn":         SleepCNN,
+        "cnn_lstm":    SleepCNNLSTM,
+        "transformer": SleepTransformer,
     }
     if name not in models:
         raise ValueError(f"Unknown model '{name}'. Choose from {list(models)}")

@@ -1,7 +1,9 @@
 # src/dataset.py
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent))
+_HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(_HERE.parent.parent))  # project root
+sys.path.insert(0, str(_HERE))
 
 import numpy as np
 from collections import Counter
@@ -236,3 +238,37 @@ def make_dataloaders(
     )
 
     return train_loader, val_loader, test_loader, class_weights
+
+
+class SequenceDataset(Dataset):
+    """
+    Wraps epoch arrays into overlapping sequences of length seq_len.
+    The label is for the center epoch of each sequence.
+    Only creates sequences within the same subject to avoid
+    mixing epochs from different recordings.
+    """
+    def __init__(self, X: np.ndarray, y: np.ndarray,
+                 subjects: np.ndarray, seq_len: int = 21):
+        self.sequences = []
+        self.labels    = []
+        half           = seq_len // 2
+
+        for sub_id in np.unique(subjects):
+            idx   = np.where(subjects == sub_id)[0]
+            X_sub = X[idx]
+            y_sub = y[idx]
+
+            for i in range(half, len(X_sub) - half):
+                seq = X_sub[i - half : i + half + 1]
+                self.sequences.append(seq)
+                self.labels.append(y_sub[i])
+
+        self.sequences = np.stack(self.sequences).astype(np.float32)
+        self.labels    = np.array(self.labels, dtype=np.int64)
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        return (torch.from_numpy(self.sequences[idx]),
+                torch.tensor(self.labels[idx]))

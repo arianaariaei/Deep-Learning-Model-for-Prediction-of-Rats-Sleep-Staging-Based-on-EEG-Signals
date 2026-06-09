@@ -1,2 +1,6 @@
 .venv
-ds006366
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store

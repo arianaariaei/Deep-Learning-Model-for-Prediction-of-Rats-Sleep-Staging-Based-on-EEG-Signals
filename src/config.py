@@ -1,18 +1,19 @@
 # src/config.py
 from pathlib import Path
 
-# ── Edit these paths to match your machine ────────────────────────────────────
-BASE         = Path(r"D:\university\4042\Deep-Learning-Model-for-Prediction-of-Rats-Sleep-Staging-Based-on-EEG-Signals\ds006366")
-FIGURES_DIR  = Path(r"D:\university\4042\Deep-Learning-Model-for-Prediction-of-Rats-Sleep-Staging-Based-on-EEG-Signals\figures")
-DATA_DIR     = Path(r"D:\university\4042\Deep-Learning-Model-for-Prediction-of-Rats-Sleep-Staging-Based-on-EEG-Signals\data")
-# ─────────────────────────────────────────────────────────────────────────────
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+BASE           = PROJECT_ROOT / "ds006366"
+FIGURES_DIR    = PROJECT_ROOT / "figures"
+DATA_DIR       = PROJECT_ROOT / "data"
+CHECKPOINT_DIR = PROJECT_ROOT / "checkpoints"
 
 # Signal constants
 SFREQ      = 128
 EPOCH_LEN  = 4
 N_SAMPLES  = SFREQ * EPOCH_LEN   # 512
 
-# Sleep stage mapping (raw code → human label)
+# Sleep stage mapping (raw code -> human label)
 STAGE_MAP = {1: "Wake", 2: "NREM", 3: "REM", 4: "Artifact"}
 
 # Create output folders if they don't exist

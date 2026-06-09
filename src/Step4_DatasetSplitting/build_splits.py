@@ -1,7 +1,9 @@
 # src/build_splits.py
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent))
+_HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(_HERE.parent.parent))  # project root
+sys.path.insert(0, str(_HERE))
 
 import numpy as np
 import matplotlib
@@ -164,7 +166,7 @@ plt.tight_layout()
 out = FIGURES_DIR / "14_split_distribution.png"
 plt.savefig(out, dpi=150, bbox_inches="tight")
 plt.close()
-print(f"\nSaved → {out}")
+print(f"\nSaved -> {out}")
 
 # ── Plot: subject assignment visualization ────────────────────────────────────
 all_subs    = np.unique(subs)
@@ -197,4 +199,4 @@ plt.tight_layout()
 out = FIGURES_DIR / "15_subject_assignment.png"
 plt.savefig(out, dpi=150, bbox_inches="tight")
 plt.close()
-print(f"Saved → {out}")
+print(f"Saved -> {out}")

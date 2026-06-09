@@ -1,7 +1,9 @@
 # src/features.py
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent))
+_HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(_HERE.parent.parent))  # project root
+sys.path.insert(0, str(_HERE))
 
 import numpy as np
 from scipy.signal import welch
@@ -76,6 +78,17 @@ def compute_spectral_entropy(epoch_1d: np.ndarray) -> float:
     psd_norm = psd / (psd.sum() + 1e-12)
     entropy  = -np.sum(psd_norm * np.log2(psd_norm + 1e-12))
     return float(entropy)
+
+
+def compute_spectral_centroid(epoch_1d: np.ndarray) -> float:
+    """
+    Power-weighted mean frequency (spectral centroid).
+    NREM: ~2-4 Hz (delta dominant), REM: ~5-8 Hz (theta), Wake: ~8-15 Hz.
+    Robust to per-epoch Z-score normalization (global scaling cancels).
+    """
+    freqs, psd = welch(epoch_1d, fs=SFREQ, nperseg=NPERSEG)
+    total = psd.sum() + 1e-12
+    return float(np.sum(freqs * psd) / total)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -171,25 +184,39 @@ def extract_epoch_features(epoch: np.ndarray) -> np.ndarray:
     Output: 1D feature vector of shape (N_FEATURES,)
 
     Feature breakdown:
-        EEG band powers      : 12  (6 bands × abs + rel)
-        EEG spectral edge    :  1
-        EEG spectral entropy :  1
-        EEG temporal stats   :  8
-        EEG Hjorth params    :  3
-        EMG features         :  4
-        ─────────────────────────
-        Total                : 29
+        EEG band powers           : 12  (6 bands × abs + rel)
+        EEG spectral edge         :  1
+        EEG spectral entropy      :  1
+        EEG spectral centroid     :  1  (power-weighted mean frequency)
+        EEG temporal stats        :  8
+        EEG Hjorth params         :  3
+        EMG features              :  4
+        Cross-channel features    :  3  (theta/delta ratio, alpha/delta ratio, xcorr)
+        ──────────────────────────────
+        Total                     : 33
     """
     eeg = epoch[0]   # EEG1  — shape (512,)
     emg = epoch[1]   # EMG   — shape (512,)
 
     features = {}
-    features.update(compute_band_powers(eeg))
-    features["spectral_edge"]    = compute_spectral_edge(eeg)
-    features["spectral_entropy"] = compute_spectral_entropy(eeg)
+    bp = compute_band_powers(eeg)
+    features.update(bp)
+    features["spectral_edge"]      = compute_spectral_edge(eeg)
+    features["spectral_entropy"]   = compute_spectral_entropy(eeg)
+    features["spectral_centroid"]  = compute_spectral_centroid(eeg)
     features.update(compute_temporal_features(eeg))
     features.update(compute_hjorth_params(eeg))
-    features.update(compute_emg_features(emg))
+    emg_feats = compute_emg_features(emg)
+    features.update(emg_feats)
+
+    # Cross-channel features — valid after per-epoch Z-score normalization
+    # (spectral ratios cancel global scaling; xcorr uses shape not amplitude)
+    features["theta_delta_ratio"] = bp["theta_abs"] - bp["delta_abs"]
+    features["alpha_delta_ratio"] = bp["alpha_abs"] - bp["delta_abs"]
+
+    eeg_norm = (eeg - eeg.mean()) / (eeg.std() + 1e-12)
+    emg_norm = (emg - emg.mean()) / (emg.std() + 1e-12)
+    features["eeg_emg_xcorr"] = float(np.mean(eeg_norm * emg_norm))
 
     return np.array(list(features.values()), dtype=np.float32)
 
@@ -200,12 +227,13 @@ def get_feature_names() -> list[str]:
     for band in FREQ_BANDS:
         names += [f"eeg_{band}_abs", f"eeg_{band}_rel"]
     names += [
-        "eeg_spectral_edge", "eeg_spectral_entropy",
+        "eeg_spectral_edge", "eeg_spectral_entropy", "eeg_spectral_centroid",
         "eeg_mean", "eeg_std", "eeg_variance",
         "eeg_skewness", "eeg_kurtosis", "eeg_rms",
         "eeg_zero_cross_rate", "eeg_line_length",
         "eeg_hjorth_activity", "eeg_hjorth_mobility", "eeg_hjorth_complexity",
         "emg_rms", "emg_hf_power", "emg_hf_ratio", "emg_variance",
+        "theta_delta_ratio", "alpha_delta_ratio", "eeg_emg_xcorr",
     ]
     return names
 
@@ -219,7 +247,7 @@ def extract_all_features(X: np.ndarray) -> np.ndarray:
     Extract features from every epoch in the dataset.
 
     Input : X of shape (N, 2, 512)
-    Output: F of shape (N, 29)
+    Output: F of shape (N, 33)
     """
     features = []
     for epoch in tqdm(X, desc="Extracting features", unit="epoch"):
@@ -265,7 +293,7 @@ if __name__ == "__main__":
 
     # ── Save ──────────────────────────────────────────────────────────────────
     np.save(DATA_DIR / "F_all.npy", F)
-    print(f"\nSaved → {DATA_DIR / 'F_all.npy'}  ({F.nbytes / 1e6:.1f} MB)")
+    print(f"\nSaved -> {DATA_DIR / 'F_all.npy'}  ({F.nbytes / 1e6:.1f} MB)")
 
     # ── Plot 1: Feature importance via class separability ─────────────────────
     # For each feature, compute how well it separates the 3 classes
@@ -307,7 +335,7 @@ if __name__ == "__main__":
     out = FIGURES_DIR / "11_feature_importance.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
     plt.close()
-    print(f"Saved → {out}")
+    print(f"Saved -> {out}")
 
     # ── Plot 2: Top 6 features — distribution per class ───────────────────────
     top6_idx = sorted_idx[:6]
@@ -332,7 +360,7 @@ if __name__ == "__main__":
     out = FIGURES_DIR / "12_top_features_distribution.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
     plt.close()
-    print(f"Saved → {out}")
+    print(f"Saved -> {out}")
 
     # ── Plot 3: Feature correlation heatmap ───────────────────────────────────
     print("Computing correlation matrix...")
@@ -350,7 +378,7 @@ if __name__ == "__main__":
     out = FIGURES_DIR / "13_feature_correlation.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
     plt.close()
-    print(f"Saved → {out}")
+    print(f"Saved -> {out}")
 
     # ── Summary ───────────────────────────────────────────────────────────────
     print("\nTop 10 most discriminative features:")

@@ -1,7 +1,9 @@
 # src/trainer.py
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent))
+_HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(_HERE.parent.parent))  # project root
+sys.path.insert(0, str(_HERE))
 
 import torch
 import torch.nn as nn
@@ -10,6 +12,34 @@ import json
 import time
 from torch.utils.data import DataLoader
 from src.config import DATA_DIR
+
+
+def augment_batch(X: torch.Tensor) -> torch.Tensor:
+    """
+    Random augmentation for raw EEG batches.
+    Works for CNN (B, C, T) and CNN+LSTM/Transformer (B, S, C, T).
+
+    Gaussian noise + amplitude jitter + random time shift.
+    Applied only during training, not validation.
+    """
+    orig_shape = X.shape
+    if X.dim() == 3:
+        flat = X.clone()
+    elif X.dim() == 4:
+        B, S, C, T = X.shape
+        flat = X.clone().view(B * S, C, T)
+    else:
+        return X
+
+    n = flat.shape[0]
+    flat = flat + torch.randn_like(flat) * 0.02
+    scale = torch.empty(n, 1, 1, device=flat.device).uniform_(0.8, 1.2)
+    flat = flat * scale
+    shifts = torch.randint(-16, 17, (n,)).tolist()
+    for i, s in enumerate(shifts):
+        if s != 0:
+            flat[i] = torch.roll(flat[i], s, dims=-1)
+    return flat.view(orig_shape)
 
 
 class EarlyStopping:
@@ -53,6 +83,7 @@ def train_one_epoch(
     criterion: nn.Module,
     device:    torch.device,
     scaler:    torch.cuda.amp.GradScaler = None,
+    augment:   bool = False,
 ) -> tuple[float, float]:
     """
     One full pass over the training set.
@@ -65,6 +96,9 @@ def train_one_epoch(
     for X_batch, y_batch in loader:
         X_batch = X_batch.to(device, non_blocking=True)
         y_batch = y_batch.to(device, non_blocking=True)
+
+        if augment:
+            X_batch = augment_batch(X_batch)
 
         optimizer.zero_grad()
 
@@ -126,6 +160,7 @@ def train(
     n_epochs:       int   = 100,
     patience:       int   = 10,
     weight_decay:   float = 1e-4,
+    augment:        bool  = False,
 ) -> dict:
     """
     Full training loop with:
@@ -147,13 +182,13 @@ def train(
 
     # Weighted loss — penalizes REM errors more heavily
     weights   = torch.tensor(class_weights, dtype=torch.float32).to(device)
-    criterion = nn.CrossEntropyLoss(weight=weights)
+    criterion = nn.CrossEntropyLoss(weight=weights, label_smoothing=0.05)
 
     optimizer = torch.optim.Adam(
         model.parameters(), lr=lr, weight_decay=weight_decay
     )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=5
+        optimizer, mode="min", factor=0.5, patience=8, min_lr=1e-6
     )
 
     checkpoint_path = checkpoint_dir / f"{model_name}_best.pt"
@@ -177,7 +212,8 @@ def train(
         t0 = time.time()
 
         tr_loss, tr_acc = train_one_epoch(
-            model, train_loader, optimizer, criterion, device, scaler
+            model, train_loader, optimizer, criterion, device, scaler,
+            augment=augment,
         )
         va_loss, va_acc = evaluate(model, val_loader, criterion, device)
         scheduler.step(va_loss)
