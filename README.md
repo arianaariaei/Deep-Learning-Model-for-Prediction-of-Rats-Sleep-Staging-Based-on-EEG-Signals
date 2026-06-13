@@ -8,12 +8,12 @@ Automatic sleep stage classification (Wake / NREM / REM) from rat EEG and EMG re
 
 | Model | Accuracy | Balanced Acc | Macro F1 | Cohen's κ | AUC-ROC | REM F1 |
 |---|---|---|---|---|---|---|
-| Baseline MLP | 0.694 | 0.640 | 0.582 | 0.464 | 0.840 | 0.326 |
-| 1D CNN | 0.830 | 0.752 | 0.739 | 0.687 | 0.918 | 0.523 |
-| **CNN + LSTM** | **0.913** | **0.873** | **0.871** | **0.840** | **0.971** | **0.765** |
-| Transformer | 0.907 | 0.868 | 0.862 | 0.829 | 0.966 | 0.750 |
+| Baseline MLP | 0.746 | 0.749 | 0.663 | 0.569 | 0.896 | 0.435 |
+| 1D CNN | 0.841 | 0.819 | 0.762 | 0.720 | 0.941 | 0.545 |
+| **CNN + LSTM** | 0.862 | 0.858 | **0.808** | 0.753 | 0.944 | **0.670** |
+| **Transformer** | **0.867** | **0.879** | 0.801 | **0.768** | **0.948** | 0.614 |
 
-Evaluated on a held-out test set of **15 subjects (19,166 epochs)** never seen during training. Cohen's κ > 0.80 is considered excellent agreement with expert scoring in the sleep staging literature.
+Evaluated on a held-out test set of **15 subjects (19,166 epochs)** never seen during training, so these reflect generalization to unseen animals. The two sequence models lead: the **Transformer** has the best accuracy, balanced accuracy, κ, and AUC, while **CNN + LSTM** has the best macro-F1 and REM-F1. Cohen's κ ≈ 0.77 indicates substantial agreement with expert scoring. REM (only ~6% of epochs) reaches 0.86–0.92 recall through class weighting alone — no oversampling.
 
 ---
 
@@ -98,8 +98,8 @@ Pipeline per recording:
 2. FIR bandpass filter 0.5–45 Hz (Hamming window)
 3. Select EEG1 + EMG channels
 4. Artifact clipping at ±6σ
-5. Slice into 4-second epochs (512 samples)
-6. Per-epoch Z-score normalization (preserves inter-epoch spectral ratios)
+5. Global Z-score normalization — per channel, computed over the whole recording, applied *before* epoching (not per 4-s epoch)
+6. Slice into 4-second epochs (512 samples)
 
 Saves `X_all.npy` (128250, 2, 512) and `y_all.npy`.
 
@@ -138,7 +138,7 @@ Trains all four models sequentially on the same GPU. Key training details:
 - Early stopping on validation loss
 - Mixed precision (AMP) for faster GPU training
 - Gradient clipping (max norm = 1.0)
-- **Data augmentation** for CNN/CNN+LSTM/Transformer: Gaussian noise (σ=0.02), amplitude jitter (×0.8–1.2), random time shift (±16 samples)
+- **Data augmentation** for CNN/CNN+LSTM/Transformer: Gaussian noise (σ=0.02), amplitude jitter (×0.8–1.2), random time shift (±16 samples, zero-padded — not circular). Fully vectorized as batched GPU ops (no per-sample Python loop)
 
 ### Step 6 — Evaluation
 ```bash
@@ -199,7 +199,9 @@ Parameters: ~2.4M
 
 ### Requirements
 ```bash
-pip install torch torchvision torchaudio  # CUDA build recommended
+# Training requires a CUDA build of PyTorch — the trainer runs on the GPU
+# (no CPU fallback). Pick the wheel matching your driver, e.g. CUDA 12.6:
+pip install torch --index-url https://download.pytorch.org/whl/cu126
 pip install mne numpy scipy scikit-learn matplotlib tqdm
 ```
 
@@ -223,11 +225,11 @@ python src/Step6_Evaluation/run_evaluation.py
 
 ## Key Design Decisions
 
-**Class imbalance (REM = 6%):** Inverse-frequency class weights in the loss function only — no oversampling during training. Oversampling + class weights causes double-correction and model collapse toward the minority class.
+**Class imbalance (REM = 6%):** Inverse-frequency class weights in the loss function only — no oversampling during training. For the sequence models (CNN+LSTM, Transformer) oversampling is especially harmful: duplicating/shuffling minority epochs into the input stream would scramble the natural sleep-stage transitions the recurrent/attention layers rely on. Class weights `[0.32, 0.29, 2.39]` handle the imbalance while leaving raw epoch order intact.
 
 **Subject-level splits:** All epochs from the same rat stay in the same split. This prevents data leakage and gives a realistic estimate of generalization to new animals.
 
-**Per-epoch normalization:** Z-score normalization per epoch per channel. Removes slow drift and inter-recording amplitude variability. Spectral ratios and Hjorth parameters are invariant to this global scaling.
+**Global normalization:** Z-score per channel computed over the entire recording and applied before epoching — not per 4-second epoch. This puts each channel on a comparable scale while preserving the relative amplitude differences *between* epochs (e.g. the drop in EMG amplitude during REM) that help separate the stages; per-epoch normalization would erase that information.
 
 **Temporal context (31 epochs = 124s):** Sleep stages have strong temporal autocorrelation — REM always follows NREM, Wake-to-sleep transitions are gradual. The LSTM and Transformer exploit this structure; the standalone CNN cannot.
 

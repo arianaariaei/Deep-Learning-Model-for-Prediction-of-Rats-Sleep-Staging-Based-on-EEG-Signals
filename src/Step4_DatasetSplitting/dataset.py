@@ -6,8 +6,6 @@ sys.path.insert(0, str(_HERE.parent.parent))  # project root
 sys.path.insert(0, str(_HERE))
 
 import numpy as np
-from collections import Counter
-from src.config import DATA_DIR
 
 CLASS_NAMES = {0: "Wake", 1: "NREM", 2: "REM"}
 
@@ -93,53 +91,12 @@ def apply_subject_split(
 #  Without correction the model learns to ignore REM almost entirely,
 #  achieving high overall accuracy but terrible REM recall.
 #
-#  We use TWO complementary strategies:
-#
-#  1. OVERSAMPLING (SMOTE-style random oversampling on raw epochs):
-#     Duplicate minority class epochs randomly until all classes
-#     have equal count. Applied to the training set only — never
-#     val or test (that would give a false picture of real performance).
-#
-#  2. CLASS WEIGHTS (for the loss function):
-#     Tell the model to penalize REM mistakes more heavily.
-#     Used during training in Step 6 as an alternative or complement
-#     to oversampling.
+#  We correct for this with CLASS WEIGHTS in the loss function (not
+#  oversampling): each class contributes to the loss inversely to its
+#  frequency, so REM mistakes are penalized more heavily. The raw epochs
+#  are left untouched — important for the sequence models, whose temporal
+#  order would be destroyed by duplicating/shuffling minority epochs.
 # ══════════════════════════════════════════════════════════════════════════════
-
-def random_oversample(
-    X: np.ndarray,
-    y: np.ndarray,
-    seed: int = 42,
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Randomly duplicate minority class samples until all classes
-    have the same count as the majority class.
-
-    Only call this on the TRAINING set.
-    Input/output shape: (N, ...) — works for both raw epochs and features.
-    """
-    rng        = np.random.default_rng(seed)
-    counts     = Counter(y.tolist())
-    max_count  = max(counts.values())
-
-    X_list = [X]
-    y_list = [y]
-
-    for cls, count in counts.items():
-        if count == max_count:
-            continue
-        n_needed = max_count - count
-        idx      = np.where(y == cls)[0]
-        chosen   = rng.choice(idx, size=n_needed, replace=True)
-        X_list.append(X[chosen])
-        y_list.append(y[chosen])
-
-    X_bal = np.concatenate(X_list, axis=0)
-    y_bal = np.concatenate(y_list, axis=0)
-
-    # Shuffle so classes aren't blocked together
-    perm  = rng.permutation(len(y_bal))
-    return X_bal[perm], y_bal[perm]
 
 
 def compute_class_weights(y: np.ndarray) -> np.ndarray:
@@ -167,7 +124,7 @@ def compute_class_weights(y: np.ndarray) -> np.ndarray:
 # ══════════════════════════════════════════════════════════════════════════════
 
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 class SleepDataset(Dataset):
     """
@@ -183,61 +140,6 @@ class SleepDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.X[idx], self.y[idx]
-
-
-def make_dataloaders(
-    splits:        dict,
-    batch_size:    int  = 128,
-    oversample:    bool = True,
-    num_workers:   int  = 0,      # set to 4 if on Linux; keep 0 on Windows
-    seed:          int  = 42,
-) -> tuple[DataLoader, DataLoader, DataLoader, np.ndarray]:
-    """
-    Build train / val / test DataLoaders from the splits dict.
-
-    Args:
-        splits      : output of apply_subject_split()
-        batch_size  : epochs per batch
-        oversample  : if True, balance training set via random oversampling
-        num_workers : parallel data loading workers
-
-    Returns:
-        train_loader, val_loader, test_loader, class_weights
-    """
-    X_tr, y_tr = splits["train"]["X"], splits["train"]["y"]
-    X_va, y_va = splits["val"]["X"],   splits["val"]["y"]
-    X_te, y_te = splits["test"]["X"],  splits["test"]["y"]
-
-    # Compute class weights BEFORE oversampling (on real distribution)
-    class_weights = compute_class_weights(y_tr)
-
-    # Oversample training set only
-    if oversample:
-        X_tr, y_tr = random_oversample(X_tr, y_tr, seed=seed)
-
-    train_loader = DataLoader(
-        SleepDataset(X_tr, y_tr),
-        batch_size  = batch_size,
-        shuffle     = True,
-        num_workers = num_workers,
-        pin_memory  = torch.cuda.is_available(),
-    )
-    val_loader = DataLoader(
-        SleepDataset(X_va, y_va),
-        batch_size  = batch_size * 2,
-        shuffle     = False,
-        num_workers = num_workers,
-        pin_memory  = torch.cuda.is_available(),
-    )
-    test_loader = DataLoader(
-        SleepDataset(X_te, y_te),
-        batch_size  = batch_size * 2,
-        shuffle     = False,
-        num_workers = num_workers,
-        pin_memory  = torch.cuda.is_available(),
-    )
-
-    return train_loader, val_loader, test_loader, class_weights
 
 
 class SequenceDataset(Dataset):

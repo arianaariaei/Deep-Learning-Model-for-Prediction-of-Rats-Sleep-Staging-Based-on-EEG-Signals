@@ -73,7 +73,7 @@ plt.suptitle(f"{sub} — Raw signals (first 5 min)", fontsize=12)
 plt.tight_layout()
 plt.savefig(FIGURES_DIR / "02_raw_signals.png", dpi=150, bbox_inches="tight")
 plt.close()
-print("Saved → 02_raw_signals.png")
+print("Saved -> 02_raw_signals.png")
 
 # ── Plot 2: Hypnogram — vectorized, no per-row loops ─────────────────────────
 print("Plotting hypnogram...")
@@ -117,6 +117,6 @@ ax.legend(handles=patches, loc="upper right", fontsize=9, ncol=3)
 plt.tight_layout()
 plt.savefig(FIGURES_DIR / "03_hypnogram.png", dpi=150, bbox_inches="tight")
 plt.close()
-print("Saved → 03_hypnogram.png")
+print("Saved -> 03_hypnogram.png")
 
 print("\nDone. Check your figures/ folder.")

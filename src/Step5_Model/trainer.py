@@ -14,13 +14,36 @@ from torch.utils.data import DataLoader
 from src.config import DATA_DIR
 
 
+def _time_shift_zeropad(x: torch.Tensor, shifts: torch.Tensor) -> torch.Tensor:
+    """
+    Shift each signal in a batch along its last (time) axis by a per-sample
+    integer amount, zero-filling the vacated region instead of wrapping around.
+
+    x      : (N, C, T)
+    shifts : (N,) int tensor — positive = delay (move right), negative = advance.
+
+    Unlike torch.roll (which is circular and glues the end of the window onto
+    its start, creating an artificial discontinuity / noise spike), this slides
+    each signal and zero-pads the gap. Fully vectorized with gather — no
+    per-sample Python loop — so it runs as a handful of GPU kernels:
+        out[n, :, t] = x[n, :, t - shifts[n]]   if 0 <= t - shifts[n] < T  else 0
+    """
+    N, C, T = x.shape
+    t       = torch.arange(T, device=x.device).unsqueeze(0)        # (1, T)
+    src     = t - shifts.to(x.device).long().unsqueeze(1)          # (N, T)
+    valid   = (src >= 0) & (src < T)                               # (N, T)
+    idx     = src.clamp_(0, T - 1).unsqueeze(1).expand(N, C, T)    # (N, C, T)
+    return torch.gather(x, 2, idx) * valid.unsqueeze(1)            # gather + zero gaps
+
+
 def augment_batch(X: torch.Tensor) -> torch.Tensor:
     """
     Random augmentation for raw EEG batches.
     Works for CNN (B, C, T) and CNN+LSTM/Transformer (B, S, C, T).
 
-    Gaussian noise + amplitude jitter + random time shift.
-    Applied only during training, not validation.
+    Gaussian noise + amplitude jitter + random time shift (zero-padded,
+    not circular). Fully vectorized — no per-sample Python loop. Applied
+    only during training, not validation.
     """
     orig_shape = X.shape
     if X.dim() == 3:
@@ -35,11 +58,9 @@ def augment_batch(X: torch.Tensor) -> torch.Tensor:
     flat = flat + torch.randn_like(flat) * 0.02
     scale = torch.empty(n, 1, 1, device=flat.device).uniform_(0.8, 1.2)
     flat = flat * scale
-    shifts = torch.randint(-16, 17, (n,)).tolist()
-    for i, s in enumerate(shifts):
-        if s != 0:
-            flat[i] = torch.roll(flat[i], s, dims=-1)
-    return flat.view(orig_shape)
+    shifts = torch.randint(-16, 17, (n,), device=flat.device)
+    flat = _time_shift_zeropad(flat, shifts)
+    return flat.reshape(orig_shape)
 
 
 class EarlyStopping:

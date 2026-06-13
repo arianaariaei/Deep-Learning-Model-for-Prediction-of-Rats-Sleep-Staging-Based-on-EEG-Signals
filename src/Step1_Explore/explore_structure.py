@@ -105,4 +105,4 @@ for bar, val in zip(axes[2].patches, lab_counts.values):
 plt.tight_layout()
 plt.savefig("../../figures/01_dataset_overview.png", dpi=150, bbox_inches="tight")
 plt.show()
-print("\nSaved → figures/01_dataset_overview.png")
+print("\nSaved -> figures/01_dataset_overview.png")

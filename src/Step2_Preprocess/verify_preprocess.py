@@ -39,17 +39,20 @@ if np.isinf(X).any():
 else:
     print("  PASS: no Inf values")
 
-# 2. Normalized — mean ≈ 0, std ≈ 1 per epoch per channel
-means = X.mean(axis=2)    # (N, C)
-stds  = X.std(axis=2)     # (N, C)
-if abs(means.mean()) > 0.1:
-    errors.append(f"FAIL: mean not near 0 (got {means.mean():.4f})")
+# 2. Globally normalized — per-channel mean ≈ 0, std ≈ 1 across the WHOLE set.
+#    Normalization is done per recording on the continuous signal (before
+#    epoching), so individual epochs are deliberately NOT z-scored on their
+#    own — only the aggregate per-channel statistics are standardized.
+ch_means = X.mean(axis=(0, 2))   # (C,)  per-channel mean over all epochs+samples
+ch_stds  = X.std(axis=(0, 2))    # (C,)  per-channel std
+if np.abs(ch_means).max() > 0.15:
+    errors.append(f"FAIL: per-channel mean not near 0 (got {np.round(ch_means, 4)})")
 else:
-    print(f"  PASS: mean ≈ {means.mean():.4f}")
-if abs(stds.mean() - 1.0) > 0.1:
-    errors.append(f"FAIL: std not near 1 (got {stds.mean():.4f})")
+    print(f"  PASS: per-channel mean ≈ {np.round(ch_means, 4)}")
+if np.abs(ch_stds - 1.0).max() > 0.25:
+    errors.append(f"FAIL: per-channel std not near 1 (got {np.round(ch_stds, 4)})")
 else:
-    print(f"  PASS: std  ≈ {stds.mean():.4f}")
+    print(f"  PASS: per-channel std  ≈ {np.round(ch_stds, 4)}")
 
 # 3. Labels are only 0, 1, 2
 unexpected = set(np.unique(y)) - {0, 1, 2}
@@ -105,7 +108,7 @@ plt.tight_layout()
 out = FIGURES_DIR / "09_preprocessed_epochs.png"
 plt.savefig(out, dpi=150, bbox_inches="tight")
 plt.close()
-print(f"\nSaved → {out}")
+print(f"\nSaved -> {out}")
 
 # ── Plot: amplitude distribution per class ────────────────────────────────────
 fig, ax = plt.subplots(figsize=(10, 4))
@@ -128,4 +131,4 @@ plt.tight_layout()
 out = FIGURES_DIR / "10_amplitude_distribution.png"
 plt.savefig(out, dpi=150, bbox_inches="tight")
 plt.close()
-print(f"Saved → {out}")
+print(f"Saved -> {out}")

@@ -95,8 +95,8 @@ if subject_labels:
     plt.tight_layout()
     plt.savefig("../../figures/08_delta_power_subjects.png", dpi=150, bbox_inches="tight")
     plt.show()
-    print("Saved → figures/08_delta_power_subjects.png")
+    print("Saved -> figures/08_delta_power_subjects.png")
 else:
     print("  No real EDF files found — skipping delta power plot.")
 
-print("Saved → figures/07_per_subject_distribution.png")
+print("Saved -> figures/07_per_subject_distribution.png")

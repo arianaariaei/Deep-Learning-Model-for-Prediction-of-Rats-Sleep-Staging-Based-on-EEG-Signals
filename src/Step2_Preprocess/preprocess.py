@@ -1,7 +1,9 @@
 # src/preprocess.py
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent))
+_HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(_HERE.parent.parent))  # project root
+sys.path.insert(0, str(_HERE))
 
 import mne
 import numpy as np
@@ -96,11 +98,24 @@ def slice_epochs(
     return X, y
 
 
-def normalize_epochs(X: np.ndarray) -> np.ndarray:
-    mean = X.mean(axis=2, keepdims=True)
-    std  = X.std(axis=2,  keepdims=True)
+def normalize_signal(data: np.ndarray) -> np.ndarray:
+    """
+    Global per-channel Z-score over the ENTIRE recording.
+
+    Mean/std are computed across the whole continuous signal (axis=1 = time)
+    and applied BEFORE the signal is sliced into 4-s epochs. This is
+    deliberately NOT a per-epoch normalization: standardizing each 4-s window
+    on its own erases the relative amplitude differences between epochs
+    (e.g. the drop in EMG amplitude during REM vs Wake) that the model relies
+    on to separate the stages. Normalizing globally keeps those differences
+    intact while still putting each channel on a comparable scale.
+
+    Input/output shape: (C, T).
+    """
+    mean = data.mean(axis=1, keepdims=True)
+    std  = data.std(axis=1,  keepdims=True)
     std  = np.where(std < 1e-10, 1.0, std)
-    return ((X - mean) / std).astype(np.float32)
+    return ((data - mean) / std).astype(np.float32)
 
 
 def preprocess_subject(
@@ -132,11 +147,13 @@ def preprocess_subject(
     data, _ = raw[:]
     data = clip_artifacts(data)
 
+    # Normalize the whole recording first, THEN slice into 4-s epochs — global
+    # normalization (not per-epoch) so inter-epoch amplitude differences survive.
+    print("Normalizing...", end=" ", flush=True)
+    data = normalize_signal(data)
+
     print("Epoching...", end=" ", flush=True)
     X, y = slice_epochs(data, events)
-
-    print("Normalizing...", end=" ", flush=True)
-    X = normalize_epochs(X)
 
     counts = {
         "Wake": int((y == 0).sum()),

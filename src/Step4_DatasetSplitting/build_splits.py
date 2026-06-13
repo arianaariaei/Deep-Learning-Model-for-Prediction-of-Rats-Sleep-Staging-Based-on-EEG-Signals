@@ -15,7 +15,6 @@ from src.config import DATA_DIR, FIGURES_DIR
 from dataset import (
     subject_split,
     apply_subject_split,
-    random_oversample,
     compute_class_weights,
     CLASS_NAMES,
 )
@@ -65,25 +64,6 @@ print(f"\nClass weights (for loss function):")
 for cls, name in CLASS_NAMES.items():
     print(f"  {name:<6}: {class_weights[cls]:.4f}")
 
-# ── Oversample training set ───────────────────────────────────────────────────
-print("\nOversampling training set...")
-
-X_tr_bal, y_tr_bal = random_oversample(
-    splits_raw["train"]["X"],
-    splits_raw["train"]["y"],
-)
-F_tr_bal, _        = random_oversample(
-    splits_feat["train"]["X"],
-    splits_feat["train"]["y"],
-)
-
-print(f"  Before: {len(splits_raw['train']['y']):,} epochs")
-print(f"  After : {len(y_tr_bal):,} epochs")
-print(f"  Class distribution after oversampling:")
-for cls, name in CLASS_NAMES.items():
-    n = int((y_tr_bal == cls).sum())
-    print(f"    {name:<6}: {n:>7,}  ({n/len(y_tr_bal)*100:.1f}%)")
-
 # ── Save everything ───────────────────────────────────────────────────────────
 print("\nSaving splits...")
 
@@ -92,22 +72,15 @@ np.save(DATA_DIR / "X_train.npy",    splits_raw["train"]["X"])
 np.save(DATA_DIR / "X_val.npy",      splits_raw["val"]["X"])
 np.save(DATA_DIR / "X_test.npy",     splits_raw["test"]["X"])
 
-# Balanced training raw epochs
-np.save(DATA_DIR / "X_train_bal.npy", X_tr_bal)
-
 # Feature matrix splits
 np.save(DATA_DIR / "F_train.npy",    splits_feat["train"]["X"])
 np.save(DATA_DIR / "F_val.npy",      splits_feat["val"]["X"])
 np.save(DATA_DIR / "F_test.npy",     splits_feat["test"]["X"])
 
-# Balanced training features
-np.save(DATA_DIR / "F_train_bal.npy", F_tr_bal)
-
 # Labels
 np.save(DATA_DIR / "y_train.npy",    splits_raw["train"]["y"])
 np.save(DATA_DIR / "y_val.npy",      splits_raw["val"]["y"])
 np.save(DATA_DIR / "y_test.npy",     splits_raw["test"]["y"])
-np.save(DATA_DIR / "y_train_bal.npy", y_tr_bal)
 
 # Class weights (needed in Step 6)
 np.save(DATA_DIR / "class_weights.npy", class_weights)
@@ -125,10 +98,6 @@ meta = {
         }
         for split in ["train", "val", "test"]
     },
-    "counts_balanced": {
-        CLASS_NAMES[c]: int((y_tr_bal == c).sum())
-        for c in [0, 1, 2]
-    },
 }
 with open(DATA_DIR / "splits_metadata.json", "w") as f:
     json.dump(meta, f, indent=2)
@@ -139,14 +108,13 @@ for fname in sorted(DATA_DIR.glob("*.npy")):
     print(f"  {fname.name:<25} {size_mb:6.1f} MB")
 
 # ── Plot: class distribution across splits ────────────────────────────────────
-fig, axes = plt.subplots(1, 4, figsize=(16, 4), sharey=False)
+fig, axes = plt.subplots(1, 3, figsize=(13, 4), sharey=False)
 colors = ["#378ADD", "#1D9E75", "#EF9F27"]
 
 datasets = [
-    ("Train (original)", splits_raw["train"]["y"]),
-    ("Train (balanced)", y_tr_bal),
-    ("Val",              splits_raw["val"]["y"]),
-    ("Test",             splits_raw["test"]["y"]),
+    ("Train", splits_raw["train"]["y"]),
+    ("Val",   splits_raw["val"]["y"]),
+    ("Test",  splits_raw["test"]["y"]),
 ]
 
 for ax, (title, y_sp) in zip(axes, datasets):

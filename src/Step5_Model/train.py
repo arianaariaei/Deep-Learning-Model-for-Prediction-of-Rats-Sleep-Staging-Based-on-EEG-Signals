@@ -13,7 +13,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from src.config import DATA_DIR, FIGURES_DIR, CHECKPOINT_DIR
-from src.Step4_DatasetSplitting.dataset import make_dataloaders, SleepDataset, CLASS_NAMES, SequenceDataset
+from src.Step4_DatasetSplitting.dataset import SleepDataset, CLASS_NAMES, SequenceDataset
 from models import get_model
 from trainer import train
 
@@ -144,6 +144,12 @@ if __name__ == "__main__":
     tr_mask = np.isin(all_subs, train_sub_ids)
     va_mask = np.isin(all_subs, val_sub_ids)
 
+    # Feed the sequence models the RAW, temporally-ordered epochs — do NOT
+    # oversample/shuffle the minority (REM) epochs before building sequences.
+    # Oversampling would splice duplicated REM epochs into the stream and
+    # scramble the natural stage transitions, so the LSTM would learn from
+    # physiologically meaningless sleep-stage sequences. Class imbalance is
+    # handled instead by the class-weighted loss (class_weights, passed below).
     print("Building sequence datasets (may take a minute)...")
     seq_train_ds = SequenceDataset(all_X[tr_mask], all_y[tr_mask],
                                    all_subs[tr_mask], seq_len=SEQ_LEN)
